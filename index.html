@@ -164,7 +164,7 @@ if(store){
     var v=s.data();if(!v)return;
     var fix={};
     if(v.title==='Our favorite moments'){v.title='Our Gallery';fix.title=v.title}
-    if(v.sub==='for you, with love'){v.sub='for my cute baby';fix.sub=v.sub}
+    if(v.sub==='for you, with love'){v.sub='for my cute baby <3';fix.sub=v.sub}
     if(fix.title||fix.sub)setDoc(store.meta,fix,{merge:true});
     if(document.activeElement!==titleEl&&v.title!=null)titleEl.textContent=v.title;
     if(document.activeElement!==subEl&&v.sub!=null)subEl.textContent=v.sub;
