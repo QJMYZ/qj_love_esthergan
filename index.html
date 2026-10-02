@@ -63,7 +63,7 @@ import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase
 import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,onSnapshot,getDoc,setDoc,addDoc,updateDoc,deleteDoc,query,orderBy} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* ====== STEP 1: paste your Firebase web-app config here ====== */
-var DATABASE_ID='collage-db'; /* must match the Database ID you create in Firebase; use '(default)' if yours is the default */
+var DATABASE_ID='(default)'; /* must match the Database ID you create in Firebase; use '(default)' if yours is the default */
 var firebaseConfig={
   apiKey:"AIzaSyD2QGj-USEpwz_i7RwEQ3lpb8k0S05VN0M",
   authDomain:"project-a8fbe.firebaseapp.com",
@@ -76,7 +76,7 @@ var firebaseConfig={
 
 var wall=document.getElementById('wall'),file=document.getElementById('file'),lb=document.getElementById('lb'),big=document.getElementById('big'),statusEl=document.getElementById('status');
 var titleEl=document.getElementById('title'),subEl=document.getElementById('sub');
-var items=[],els={},target=null,metaT=null,n=0,ops,store=null;
+var initErr=null,items=[],els={},target=null,metaT=null,n=0,ops,store=null;
 function say(t){statusEl.textContent=t}
 
 var configured=firebaseConfig.apiKey.indexOf('PASTE')!==0;
@@ -87,7 +87,7 @@ if(configured){
     try{fs=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})},DATABASE_ID)}
     catch(e){fs=initializeFirestore(app,{},DATABASE_ID)}
     store={fs:fs,photos:collection(fs,'photos'),meta:doc(fs,'collage','meta')};
-  }catch(e){store=null}
+  }catch(e){store=null;initErr=e}
 }
 
 function shrink(fl,max,q){return new Promise(function(res,rej){
@@ -137,10 +137,10 @@ if(store){
     remove:function(id){return deleteDoc(doc(store.fs,'photos',id))},
     meta:function(){clearTimeout(metaT);metaT=setTimeout(function(){setDoc(store.meta,{title:titleEl.textContent,sub:subEl.textContent},{merge:true})},600)}
   };
-  var err=function(){say('Cannot reach Firebase. Check your config and Firestore rules.')};
+  var err=function(e){say('Firebase error ('+((e&&e.code)||e)+'). Check your config, database ID and Firestore rules.')};
   getDoc(store.meta).then(function(s){
     if(!s.exists()){setDoc(store.meta,{title:titleEl.textContent,sub:subEl.textContent});for(var i=0;i<6;i++)ops.add(null,'',Date.now()+i)}
-  }).catch(function(){});
+  }).catch(err);
   onSnapshot(query(store.photos,orderBy('order')),{includeMetadataChanges:true},function(s){
     items=s.docs.map(function(d){var v=d.data();return {id:d.id,src:v.src,cap:v.cap}});
     render();say(s.metadata.hasPendingWrites?'Saving\u2026':(s.metadata.fromCache?'Offline: will sync when connected':'Saved and synced'));
@@ -159,10 +159,11 @@ if(store){
     meta:function(){}
   };
   for(var i=0;i<6;i++)ops.add(null,'');
-  say('Firebase is not set up yet, so nothing is saved. Paste your config into the file.');
+  say(initErr?('Firebase setup error: '+(initErr.message||initErr)):'Firebase is not set up yet, so nothing is saved. Paste your config into the file.');
 }
 
-async function addFiles(files){
+function addFiles(files){addFiles2(files).catch(function(e){say('Could not save ('+((e&&e.code)||e)+')')})}
+async function addFiles2(files){
   say('Adding photos\u2026');
   for(var i=0;i<files.length;i++){
     var src;try{src=await shrink(files[i],1000,.78)}catch(e){continue}
