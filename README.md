@@ -1,2 +1,0 @@
-# qjzz
-photo collage
