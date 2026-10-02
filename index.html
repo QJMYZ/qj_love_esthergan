@@ -64,7 +64,9 @@ dialog img{max-width:94vw;max-height:88vh;display:block;border:10px solid var(--
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,onSnapshot,getDoc,setDoc,addDoc,updateDoc,deleteDoc,query,orderBy} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-/* ====== STEP 1: paste your Firebase web-app config here ====== */
+/* ====== STEP 1: // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+
+
 var DATABASE_ID='(default)'; /* must match the Database ID you create in Firebase; use '(default)' if yours is the default */
 var firebaseConfig={
   apiKey:"AIzaSyD2QGj-USEpwz_i7RwEQ3lpb8k0S05VN0M",
@@ -73,6 +75,7 @@ var firebaseConfig={
   storageBucket:"project-a8fbe.firebasestorage.app",
   messagingSenderId:"299669271606",
   appId:"1:299669271606:web:a6a39f8a061295e3fa1497"
+  measurementId: "G-YW57TDFMWB"
 };
 /* ============================================================== */
 
