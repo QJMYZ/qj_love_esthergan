@@ -61,12 +61,15 @@ dialog img{max-width:94vw;max-height:88vh;display:block;border:10px solid var(--
 <main class="wall" id="wall"></main>
 <dialog id="lb"><img alt="" id="big"></dialog>
 <script type="module">
-import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,onSnapshot,getDoc,setDoc,addDoc,updateDoc,deleteDoc,query,orderBy} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+var initializeApp,initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,onSnapshot,getDoc,setDoc,addDoc,updateDoc,deleteDoc,query,orderBy,loadErr=null;
+try{
+  var A=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+  var F=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+  initializeApp=A.initializeApp;initializeFirestore=F.initializeFirestore;persistentLocalCache=F.persistentLocalCache;persistentMultipleTabManager=F.persistentMultipleTabManager;
+  collection=F.collection;doc=F.doc;onSnapshot=F.onSnapshot;getDoc=F.getDoc;setDoc=F.setDoc;addDoc=F.addDoc;updateDoc=F.updateDoc;deleteDoc=F.deleteDoc;query=F.query;orderBy=F.orderBy;
+}catch(e){loadErr=e}
 
-/* ====== STEP 1: // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-
-
+/* ====== STEP 1: paste your Firebase web-app config here ====== */
 var DATABASE_ID='(default)'; /* must match the Database ID you create in Firebase; use '(default)' if yours is the default */
 var firebaseConfig={
   apiKey:"AIzaSyD2QGj-USEpwz_i7RwEQ3lpb8k0S05VN0M",
@@ -75,16 +78,18 @@ var firebaseConfig={
   storageBucket:"project-a8fbe.firebasestorage.app",
   messagingSenderId:"299669271606",
   appId:"1:299669271606:web:a6a39f8a061295e3fa1497"
-  measurementId: "G-YW57TDFMWB"
 };
 /* ============================================================== */
 
+window.addEventListener('error',function(e){document.getElementById('status').textContent='Error: '+e.message});
+window.addEventListener('unhandledrejection',function(e){var r=e.reason;document.getElementById('status').textContent='Error: '+((r&&(r.code||r.message))||r)});
 var wall=document.getElementById('wall'),file=document.getElementById('file'),lb=document.getElementById('lb'),big=document.getElementById('big'),statusEl=document.getElementById('status');
 var titleEl=document.getElementById('title'),subEl=document.getElementById('sub');
 var initErr=null,items=[],els={},target=null,metaT=null,n=0,ops,store=null;
 function say(t){statusEl.textContent=t}
 
-var configured=firebaseConfig.apiKey.indexOf('PASTE')!==0;
+var configured=!loadErr&&firebaseConfig.apiKey.indexOf('PASTE')!==0;
+if(loadErr)initErr=loadErr;
 if(configured){
   try{
     var app=initializeApp(firebaseConfig);
@@ -142,7 +147,12 @@ if(store){
     remove:function(id){return deleteDoc(doc(store.fs,'photos',id))},
     meta:function(){clearTimeout(metaT);metaT=setTimeout(function(){setDoc(store.meta,{title:titleEl.textContent,sub:subEl.textContent},{merge:true})},600)}
   };
-  var err=function(e){say('Firebase error ('+((e&&e.code)||e)+'). Check your config, database ID and Firestore rules.')};
+  var err=function(e){
+    var c=(e&&e.code)||'';
+    if(c==='permission-denied')say('Not allowed: in Firebase go to Firestore > Rules and publish the open rules, then refresh.');
+    else if(c==='not-found'||c==='failed-precondition'||c==='unavailable')say('Database not found: in Firebase go to Build > Firestore Database and click Create database (ID must be (default)), then refresh.');
+    else say('Firebase error ('+(c||e)+'). Check your config, database ID and Firestore rules.');
+  };
   getDoc(store.meta).then(function(s){
     if(!s.exists()){setDoc(store.meta,{title:titleEl.textContent,sub:subEl.textContent});for(var i=0;i<6;i++)ops.add(null,'',Date.now()+i)}
   }).catch(err);
@@ -183,7 +193,7 @@ async function addFiles2(files){
   }
 }
 document.getElementById('add').addEventListener('click',function(){target=null;file.setAttribute('multiple','');file.click()});
-document.getElementById('more').addEventListener('click',function(){ops.add(null,'')});
+document.getElementById('more').addEventListener('click',function(){Promise.resolve(ops.add(null,'')).catch(function(e){say('Could not add frame ('+((e&&e.code)||e)+')')})});
 file.addEventListener('change',function(){var fl=Array.prototype.slice.call(file.files);file.value='';if(fl.length)addFiles(fl);else target=null});
 lb.addEventListener('click',function(){lb.close()});
 titleEl.addEventListener('input',ops.meta);subEl.addEventListener('input',ops.meta);
