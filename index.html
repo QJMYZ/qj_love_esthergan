@@ -273,39 +273,51 @@ async function playVideo(id){
   }catch(e){say('Could not load video ('+((e&&e.code)||e)+')')}
 }
 function addVideo(file){return new Promise(function(done){
-  var MAXS=12,tid=target,dead=false;target=null;
+  var MAXS=12,tid=target,dead=false,started=false,poster=null,raf,wd;target=null;
   var url=URL.createObjectURL(file),v=document.createElement('video');
-  v.muted=true;v.playsInline=true;v.preload='auto';v.src=url;
-  function fail(m){dead=true;URL.revokeObjectURL(url);say(m);done()}
-  v.onerror=function(){fail('This video could not be read. Try another one (MP4 works best).')};
-  v.onloadeddata=function(){
+  v.muted=true;v.playsInline=true;v.setAttribute('playsinline','');v.preload='auto';
+  v.style.cssText='position:fixed;left:-9999px;top:0;width:2px;height:2px;opacity:0;pointer-events:none';
+  document.body.appendChild(v);
+  function cleanup(){clearTimeout(wd);cancelAnimationFrame(raf);URL.revokeObjectURL(url);v.remove()}
+  function fail(m){dead=true;cleanup();say(m);done()}
+  wd=setTimeout(function(){if(!started)fail('The video took too long to load. Try a shorter MP4 clip.')},15000);
+  v.onerror=function(){fail('Your browser cannot read this video (iPhone .mov/HEVC files often fail on a computer). Try an MP4.')};
+  v.onloadedmetadata=function(){
+    if(started)return;started=true;clearTimeout(wd);
+    if(!v.videoWidth)return fail('Could not read this video.');
     var sc=Math.min(1,480/Math.max(v.videoWidth,v.videoHeight)),w=Math.round(v.videoWidth*sc)&~1,h=Math.round(v.videoHeight*sc)&~1,c=document.createElement('canvas'),x=c.getContext('2d');
-    c.width=w;c.height=h;var dur=Math.min(MAXS,v.duration||MAXS);
-    x.drawImage(v,0,0,w,h);var poster=c.toDataURL('image/jpeg',.7);
+    c.width=w;c.height=h;var dur=Math.min(MAXS,(isFinite(v.duration)&&v.duration>0)?v.duration:MAXS);
     var types=['video/mp4;codecs=avc1.42E01E','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'],mt='';
     if(window.MediaRecorder)types.forEach(function(t){if(!mt&&MediaRecorder.isTypeSupported(t))mt=t});
     if(!mt||!c.captureStream)return fail('This browser cannot process videos. Try the latest Chrome or Safari.');
-    var rec=new MediaRecorder(c.captureStream(24),{mimeType:mt,videoBitsPerSecond:450000}),parts=[],raf;
+    var rec;try{rec=new MediaRecorder(c.captureStream(24),{mimeType:mt,videoBitsPerSecond:450000})}catch(e){return fail('Video processing failed to start ('+((e&&e.name)||e)+').')}
+    var parts=[];
     rec.ondataavailable=function(e){if(e.data.size)parts.push(e.data)};
+    rec.onerror=function(){fail('Video processing failed. Try another clip.')};
     rec.onstop=function(){
-      if(dead)return;cancelAnimationFrame(raf);URL.revokeObjectURL(url);
+      if(dead)return;if(!poster)poster=c.toDataURL('image/jpeg',.7);cleanup();
       var blob=new Blob(parts,{type:mt.split(';')[0]}),fr=new FileReader();
       fr.onload=function(){
         var b64=String(fr.result).split(',')[1]||'',chunks=[];
         for(var i=0;i<b64.length;i+=700000)chunks.push(b64.slice(i,i+700000));
-        if(!chunks.length||chunks.length>5)return fail('That video is too large to save. Try a shorter clip.');
+        if(!chunks.length)return fail('Video processing produced no data. Try another clip.');
+        if(chunks.length>5)return fail('That video is too large to save. Try a shorter clip.');
         var empty=items.find(function(o){return !o.src}),id=tid||(empty&&empty.id)||null;
-        Promise.resolve(ops.video(id,poster,blob.type,chunks,blob)).then(function(){say('Video added');done()}).catch(function(e){fail('Could not save video ('+((e&&e.code)||e)+')')});
+        say('Saving video\u2026');
+        Promise.resolve(ops.video(id,poster,blob.type,chunks,blob)).then(function(){say('Video added');done()}).catch(function(e){fail('Could not save video to Firebase ('+((e&&e.code)||e)+'). Check your Firestore rules.')});
       };fr.readAsDataURL(blob);
     };
     say('Processing video\u2026 keep this tab open (about '+Math.ceil(dur)+' seconds)');
-    rec.start(500);v.currentTime=0;
+    wd=setTimeout(function(){if(rec.state!=='inactive'){v.pause();rec.stop()}},(dur+8)*1000);
+    rec.start(500);
     v.play().then(function(){
       (function loop(){x.drawImage(v,0,0,w,h);
+        if(!poster&&v.currentTime>.15)poster=c.toDataURL('image/jpeg',.7);
         if(v.ended||v.currentTime>=dur){v.pause();if(rec.state!=='inactive')rec.stop();return}
         raf=requestAnimationFrame(loop)})();
-    }).catch(function(){dead=true;if(rec.state!=='inactive')rec.stop();fail('The browser blocked video processing. Please try again.')});
+    }).catch(function(){if(rec.state!=='inactive')try{rec.stop()}catch(e){}fail('The browser blocked video processing. Please try again.')});
   };
+  v.src=url;
 })}
 function addFiles(files){addFiles2(files).catch(function(e){say('Could not save ('+((e&&e.code)||e)+')')})}
 async function addFiles2(files){
